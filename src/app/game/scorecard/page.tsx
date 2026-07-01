@@ -7,13 +7,16 @@ import { db } from '@/lib/db';
 import type { Match, Player, PlayerId, Innings } from '@/types';
 import { formatOvers } from '@/lib/overs';
 import { strikeRate, economyRate, wicketTypeLabel } from '@/lib/utils';
+import { exportMatchText } from '@/lib/export';
 
 function ScorecardPageInner() {
   const searchParams = useSearchParams();
   const id = searchParams.get('id') ?? '';
   const [match, setMatch] = useState<Match | null>(null);
   const [players, setPlayers] = useState<Record<PlayerId, Player>>({});
+  const [playerList, setPlayerList] = useState<Player[]>([]);
   const [activeTab, setActiveTab] = useState(0);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     db.matches.get(id).then(m => {
@@ -26,6 +29,7 @@ function ScorecardPageInner() {
       const map: Record<string, Player> = {};
       all.forEach(p => { map[p.id] = p; });
       setPlayers(map);
+      setPlayerList(all);
     });
   }, [id]);
 
@@ -38,6 +42,33 @@ function ScorecardPageInner() {
   }
 
   const innings = match.innings[activeTab];
+
+  async function handleExport() {
+    if (!match) return;
+    const text = exportMatchText(match, playerList);
+    if (navigator.share) {
+      try {
+        await navigator.share({ text });
+        return;
+      } catch {
+        // user cancelled or share failed, fall through to clipboard
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
 
   function getHowOut(inn: Innings, playerId: PlayerId): string {
     const batter = inn.batters.find(b => b.playerId === playerId);
@@ -63,14 +94,24 @@ function ScorecardPageInner() {
               Scorecard
             </h1>
           </div>
-          {match.status === 'in_progress' && (
-            <Link
-              href={`/game?id=${id}`}
-              className="text-sm text-accent-green font-medium"
-            >
-              Resume
-            </Link>
-          )}
+          <div className="flex items-center gap-3">
+            {match.status === 'in_progress' && (
+              <Link
+                href={`/game?id=${id}`}
+                className="text-sm text-accent-green font-medium"
+              >
+                Resume
+              </Link>
+            )}
+            {match.innings.length > 0 && (
+              <button
+                onClick={handleExport}
+                className="text-sm text-text-secondary hover:text-text-primary transition-colors"
+              >
+                {copied ? 'Copied!' : 'Export'}
+              </button>
+            )}
+          </div>
         </div>
         {match.result && (
           <p className="text-sm text-accent-gold font-medium mt-1">{match.result}</p>
