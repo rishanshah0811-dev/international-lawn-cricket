@@ -78,5 +78,13 @@ export const db = {
       });
       if (error) throw error;
     },
+
+    async remove(id: string): Promise<void> {
+      const { error } = await supabase
+        .from('matches')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+    },
   },
 };

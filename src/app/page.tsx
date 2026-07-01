@@ -8,6 +8,7 @@ import type { Match } from '@/types';
 export default function HomePage() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     db.matches.list().then(m => {
@@ -15,6 +16,12 @@ export default function HomePage() {
       setLoading(false);
     });
   }, []);
+
+  async function handleDelete(id: string) {
+    await db.matches.remove(id);
+    setMatches(prev => prev.filter(m => m.id !== id));
+    setConfirmDeleteId(null);
+  }
 
   function getStatusBadge(status: Match['status']) {
     switch (status) {
@@ -65,25 +72,59 @@ export default function HomePage() {
           </div>
         ) : (
           matches.map(match => (
-            <Link
-              key={match.id}
-              href={match.status === 'completed' ? `/game/scorecard?id=${match.id}` : `/game?id=${match.id}`}
-              className="block bg-bg-card border border-border rounded-xl p-4 hover:bg-bg-elevated transition-colors active:scale-[0.98]"
-            >
-              <div className="flex items-start justify-between mb-2">
-                <h3 className="font-[family-name:var(--font-display)] font-semibold text-text-primary">
-                  {match.teams[0].name} vs {match.teams[1].name}
-                </h3>
-                {getStatusBadge(match.status)}
-              </div>
-              <p className="text-sm text-text-secondary mb-2">{getMatchSummary(match)}</p>
-              {match.result && (
-                <p className="text-xs text-accent-gold font-medium">{match.result}</p>
+            <div key={match.id} className="relative">
+              <Link
+                href={match.status === 'completed' ? `/game/scorecard?id=${match.id}` : `/game?id=${match.id}`}
+                className="block bg-bg-card border border-border rounded-xl p-4 hover:bg-bg-elevated transition-colors active:scale-[0.98]"
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <h3 className="font-[family-name:var(--font-display)] font-semibold text-text-primary">
+                    {match.teams[0].name} vs {match.teams[1].name}
+                  </h3>
+                  {getStatusBadge(match.status)}
+                </div>
+                <p className="text-sm text-text-secondary mb-2">{getMatchSummary(match)}</p>
+                {match.result && (
+                  <p className="text-xs text-accent-gold font-medium">{match.result}</p>
+                )}
+                <p className="text-xs text-text-muted mt-1">
+                  {new Date(match.updatedAt).toLocaleDateString()}
+                </p>
+              </Link>
+
+              {match.status !== 'in_progress' && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setConfirmDeleteId(match.id);
+                  }}
+                  className="absolute top-3 right-3 p-1.5 rounded-lg text-text-muted hover:text-red-400 hover:bg-red-400/10 transition-colors z-10"
+                  aria-label="Delete match"
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                    <path d="M2 4h12M5.33 4V2.67a1.33 1.33 0 011.34-1.34h2.66a1.33 1.33 0 011.34 1.34V4m2 0v9.33a1.33 1.33 0 01-1.34 1.34H4.67a1.33 1.33 0 01-1.34-1.34V4h9.34z" />
+                  </svg>
+                </button>
               )}
-              <p className="text-xs text-text-muted mt-1">
-                {new Date(match.updatedAt).toLocaleDateString()}
-              </p>
-            </Link>
+
+              {confirmDeleteId === match.id && (
+                <div className="absolute inset-0 bg-bg-card/95 border border-red-400/30 rounded-xl flex items-center justify-center gap-3 z-20">
+                  <span className="text-sm text-text-secondary">Delete this match?</span>
+                  <button
+                    onClick={() => handleDelete(match.id)}
+                    className="px-3 py-1.5 bg-red-500 text-white text-sm font-semibold rounded-lg active:scale-95 transition-transform"
+                  >
+                    Delete
+                  </button>
+                  <button
+                    onClick={() => setConfirmDeleteId(null)}
+                    className="px-3 py-1.5 bg-bg-secondary border border-border text-text-secondary text-sm rounded-lg active:scale-95 transition-transform"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
           ))
         )}
       </main>
