@@ -7,7 +7,7 @@ import { db } from '@/lib/db';
 import type { Match, Player, PlayerId, Innings } from '@/types';
 import { formatOvers } from '@/lib/overs';
 import { strikeRate, economyRate, wicketTypeLabel } from '@/lib/utils';
-import { exportMatchText } from '@/lib/export';
+import { downloadMatchFile } from '@/lib/export';
 
 function ScorecardPageInner() {
   const searchParams = useSearchParams();
@@ -16,7 +16,6 @@ function ScorecardPageInner() {
   const [players, setPlayers] = useState<Record<PlayerId, Player>>({});
   const [playerList, setPlayerList] = useState<Player[]>([]);
   const [activeTab, setActiveTab] = useState(0);
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     db.matches.get(id).then(m => {
@@ -43,31 +42,9 @@ function ScorecardPageInner() {
 
   const innings = match.innings[activeTab];
 
-  async function handleExport() {
+  function handleExport() {
     if (!match) return;
-    const text = exportMatchText(match, playerList);
-    if (navigator.share) {
-      try {
-        await navigator.share({ text });
-        return;
-      } catch {
-        // user cancelled or share failed, fall through to clipboard
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-    }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    downloadMatchFile(match, playerList);
   }
 
   function getHowOut(inn: Innings, playerId: PlayerId): string {
@@ -108,7 +85,7 @@ function ScorecardPageInner() {
                 onClick={handleExport}
                 className="text-sm text-text-secondary hover:text-text-primary transition-colors"
               >
-                {copied ? 'Copied!' : 'Export'}
+                Export
               </button>
             )}
           </div>
